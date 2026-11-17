@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f8f7f3">
+    <title>每日三分鐘 — AI 寫作靈感</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="每日三分鐘首頁">
+        <span class="brand-mark">字</span>
+        <span>每日三分鐘<span class="brand-dot">.</span></span>
+      </a>
+      <div class="topbar-note"><span class="status-dot"></span> AI 寫作練習室</div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-line"></span> WRITE A LITTLE, EVERY DAY</div>
+          <h1>每天三分鐘，<br><span>讓靈感慢慢長大。</span></h1>
+          <p>選好日期，讓 AI 為你準備每天一份剛剛好的<br class="desktop-break">寫作素材，把好句子變成自己的表達。</p>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="art-sun"></div><div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div>
+          <div class="art-spark spark-one">✳</div><div class="art-spark spark-two">✳</div>
+          <div class="art-note"><span>一點靈感</span><strong>✍</strong></div>
+        </div>
+      </section>
+
+      <section class="planner panel" aria-labelledby="planner-title">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> YOUR NEXT CHAPTER</div>
+            <h2 id="planner-title">安排你的寫作日程</h2>
+          </div>
+          <span class="step-badge"><span>01</span> 設定日期</span>
+        </div>
+        <form id="planner-form">
+          <div class="date-fields">
+            <label class="date-field">
+              <span>開始日期</span>
+              <span class="input-wrap"><span class="calendar-icon" aria-hidden="true">▦</span><input id="start-date" name="startDate" type="date" required></span>
+            </label>
+            <span class="date-arrow" aria-hidden="true">→</span>
+            <label class="date-field">
+              <span>結束日期</span>
+              <span class="input-wrap"><span class="calendar-icon" aria-hidden="true">▦</span><input id="end-date" name="endDate" type="date" required></span>
+            </label>
+            <button class="generate-button" type="submit"><span class="button-spark">✳</span> 生成我的素材 <span class="button-arrow">↗</span></button>
+          </div>
+          <div class="form-footnote"><span>✦</span> AI 依星期安排主題，週末自動休息。一次最多安排 31 天。</div>
+        </form>
+      </section>
+
+      <section class="schedule-section" aria-labelledby="schedule-title">
+        <div class="schedule-heading">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> YOUR DAILY INSPIRATION</div>
+            <h2 id="schedule-title">本週靈感 <span class="result-count" id="result-count">範例</span></h2>
+          </div>
+          <div class="schedule-caption"><span class="tiny-spark">✳</span> 每天一點點，累積大大的進步</div>
+        </div>
+        <div id="message" class="message" role="status" aria-live="polite"></div>
+        <div id="schedule-list" class="schedule-list"></div>
+        <p class="sample-note" id="sample-note">以下為內容示例。選擇日期並生成，即可取得 AI 為你撰寫的專屬素材。</p>
+      </section>
+    </main>
+
+    <footer><span>每日三分鐘<span class="brand-dot">.</span></span><span>靈感不必等，寫下來就好。</span></footer>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
