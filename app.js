@@ -34,11 +34,22 @@ const examples = [
 const form = document.querySelector("#planner-form");
 const startInput = document.querySelector("#start-date");
 const endInput = document.querySelector("#end-date");
+const apiKeyInput = document.querySelector("#api-key");
 const list = document.querySelector("#schedule-list");
 const message = document.querySelector("#message");
 const count = document.querySelector("#result-count");
 const sampleNote = document.querySelector("#sample-note");
 const button = form.querySelector("button");
+const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+const categories = {
+  1: "文言積累",
+  2: "人物描寫",
+  3: "景物描寫",
+  4: "議論文素材",
+  5: "素材轉化",
+};
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL = "inclusionai/ling-3.2-flash:free";
 
 function toLocalDateInput(date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -59,6 +70,40 @@ function setDefaultDates() {
 function formatDate(value) {
   const [year, month, day] = value.split("-").map(Number);
   return `${month}月${day}日`;
+}
+
+function getWeekdayPlan(startDate, endDate) {
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (!datePattern.test(startDate) || !datePattern.test(endDate)) return null;
+
+  const start = new Date(`${startDate}T00:00:00.000Z`);
+  const end = new Date(`${endDate}T00:00:00.000Z`);
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    start.toISOString().slice(0, 10) !== startDate ||
+    end.toISOString().slice(0, 10) !== endDate ||
+    end < start
+  ) {
+    return null;
+  }
+
+  const days = (end - start) / 86_400_000;
+  if (days > 30) return null;
+
+  const plan = [];
+  for (let offset = 0; offset <= days; offset += 1) {
+    const date = new Date(start.getTime() + offset * 86_400_000);
+    const weekday = date.getUTCDay();
+    if (categories[weekday]) {
+      plan.push({
+        date: date.toISOString().slice(0, 10),
+        weekday: weekdays[weekday],
+        category: categories[weekday],
+      });
+    }
+  }
+  return plan;
 }
 
 function renderItems(items) {
@@ -104,9 +149,22 @@ renderItems(examples);
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (endInput.value < startInput.value) {
-    showMessage("結束日期不能早於開始日期，請重新選擇。");
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) {
+    showMessage("請輸入 OpenRouter API 金鑰後再生成。");
+    apiKeyInput.focus();
+    return;
+  }
+
+  const plan = getWeekdayPlan(startInput.value, endInput.value);
+  if (!plan) {
+    showMessage("請選擇有效日期，結束日期不得早於開始日期，且日期範圍不能超過 31 天。");
     endInput.focus();
+    return;
+  }
+  if (plan.length === 0) {
+    showMessage("所選日期範圍沒有星期一至星期五，請重新選擇。");
+    startInput.focus();
     return;
   }
 
@@ -117,14 +175,74 @@ form.addEventListener("submit", async (event) => {
   sampleNote.hidden = true;
 
   try {
-    const response = await fetch("/api/generate", {
+    const schedule = plan
+      .map(({ date, weekday, category }) => `${date}（${weekday}）：${category}`)
+      .join("\n");
+    const response = await fetch(OPENROUTER_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startDate: startInput.value, endDate: endInput.value }),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              "你是繁體中文寫作老師，為中學生製作每日三分鐘的寫作素材。只輸出 JSON 物件，格式為 {\"items\":[{\"date\":\"YYYY-MM-DD\",\"weekday\":\"星期一\",\"category\":\"文言積累\",\"content\":\"...\"}]}。日期、星期和類別必須與提供的清單完全一致。內容精簡、原創、適合學生；引用名言時避免無法核實的作者歸屬。",
+          },
+          {
+            role: "user",
+            content: `請為以下每個上課日各撰寫一則可直接使用的寫作練習，依類別選擇相應格式：文言積累提供實詞、意思及例句；人物描寫和景物描寫提供佳句及手法；議論文素材提供名言或事例及適用主題；素材轉化寫至少 50 個中文字的短文。只包含清單中日期，不需生成週末內容。\n\n${schedule}`,
+          },
+        ],
+      }),
     });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "生成失敗，請稍後再試。");
-    renderItems(result.items);
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error("OpenRouter 回傳格式無效，請稍後再試。");
+    }
+    if (!response.ok) {
+      throw new Error(
+        response.status === 429
+          ? "OpenRouter 免費模型目前繁忙或額度已用完，請稍後再試。"
+          : result.error?.message || "AI 生成失敗，請確認 API 金鑰及 OpenRouter 設定。",
+      );
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(result.choices?.[0]?.message?.content);
+    } catch {
+      throw new Error("AI 回傳格式無效，請再試一次。");
+    }
+    if (!Array.isArray(parsed?.items) || parsed.items.length !== plan.length) {
+      throw new Error("AI 回傳格式無效，請再試一次。");
+    }
+    const expectedItems = new Map(plan.map((item) => [item.date, item]));
+    const seenDates = new Set();
+    const items = parsed.items.map((item) => {
+      if (!item || typeof item !== "object") {
+        throw new Error("AI 回傳格式無效，請再試一次。");
+      }
+      const expected = expectedItems.get(item.date);
+      if (
+        !expected ||
+        seenDates.has(item.date) ||
+        item.weekday !== expected.weekday ||
+        item.category !== expected.category ||
+        typeof item.content !== "string"
+      ) {
+        throw new Error("AI 回傳格式無效，請再試一次。");
+      }
+      seenDates.add(item.date);
+      return item;
+    });
+    renderItems(items);
     message.className = "message";
   } catch (error) {
     showMessage(error.message || "目前無法連接 AI 服務，請稍後再試。");
