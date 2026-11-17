@@ -82,6 +82,11 @@ async function generatePlan(request, response) {
     return sendJson(response, 400, { error: error.message });
   }
 
+  const apiKey = typeof input?.apiKey === "string" ? input.apiKey.trim() : "";
+  if (!apiKey) {
+    return sendJson(response, 400, { error: "請輸入 OpenRouter API 金鑰。" });
+  }
+
   const plan = getWeekdayPlan(input?.startDate, input?.endDate);
   if (!plan) {
     return sendJson(response, 400, {
@@ -90,9 +95,6 @@ async function generatePlan(request, response) {
   }
   if (plan.length === 0) {
     return sendJson(response, 400, { error: "所選日期範圍沒有星期一至星期五，請重新選擇。" });
-  }
-  if (!process.env.OPENROUTER_API_KEY) {
-    return sendJson(response, 503, { error: "尚未設定 OPENROUTER_API_KEY，暫時無法使用 AI 生成。" });
   }
 
   const schedule = plan
@@ -103,7 +105,7 @@ async function generatePlan(request, response) {
     upstream = await fetch(process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -117,7 +119,14 @@ async function generatePlan(request, response) {
           },
           {
             role: "user",
-            content: `請為以下每個上課日各撰寫一則可直接使用的寫作練習，依類別選擇相應格式：文言積累提供實詞、意思及例句；人物描寫和景物描寫提供佳句及手法；議論文素材提供名言或事例及適用主題；素材轉化寫至少 50 個中文字的短文。只包含清單中日期，不需生成週末內容。\n\n${schedule}`,
+            content: [
+              "請為以下每個上課日各撰寫一則可直接使用的寫作練習。",
+              "清單每行格式為「日期（星期X）：類別」，例如「2026-09-07（星期一）：文言積累」。輸出的 weekday 欄位必須包含清單中的星期，例如「星期一」，並且日期、星期和類別必須完全一致。",
+              "依類別選擇相應格式：文言積累提供實詞、意思及例句；人物描寫和景物描寫提供佳句及手法；議論文素材提供名言或事例及適用主題；素材轉化寫至少 50 個中文字的短文。",
+              "只包含清單中日期，不需生成週末內容。",
+              "",
+              schedule,
+            ].join("\n"),
           },
         ],
       }),
